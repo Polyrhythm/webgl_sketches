@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "budo index.js --open --live --host localhost -- -t es2040 -t glslify"
+    "start": "budo index.js --open --live --host localhost -- -t es2040 -t glslify",
+    "build": "browserify index.js -t es2040 -t glslify | indexhtmlify > index.html"
   },
   "keywords": [],
   "author": "",
