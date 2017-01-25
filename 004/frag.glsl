@@ -1,3 +1,5 @@
+// https://www.shadertoy.com/view/XlKSDR
+
 precision highp float;
 
 #define PI 3.14159265359
@@ -30,12 +32,22 @@ vec2 opUnion(vec2 d1, vec2 d2) {
 // x stores distance scalar
 // y stores material
 vec2 map(vec3 p) {
-  vec2 scene = opUnion(
+  vec2 s1 = opUnion(
     vec2(sdSphere(p, 0.4), METAL),
+    vec2(sdSphere(p + vec3(0.0, 0.0, 0.85), 0.4), METAL)
+  );
+
+  vec2 s2 = opUnion(
+    s1,
     vec2(sdPlane(p + vec3(0.0, 0.4, 0.0)), CHECKER_MARBLE)
   );
 
-  return scene;
+  vec2 s3 = opUnion(
+    s2,
+    vec2(sdSphere(p - vec3(0.0, 0.0, 0.85), 0.4), METAL)
+  );
+
+  return s3;
 }
 
 // -------------------------
@@ -99,9 +111,33 @@ float lambert(vec3 pos, vec3 n) {
   return clamp(dot(normalize(LIGHT_POS - pos), n), 0.0, 1.0);
 }
 
+// https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
+float GGX(float linearRoughness, float NoH, const vec3 h) {
+  float oneMinusNoHSquared = 1.0 - NoH * NoH;
+  float a = NoH * linearRoughness;
+  float k = linearRoughness / (oneMinusNoHSquared + a * a);
+  float d = k * k * (1.0 / PI);
+
+  return d;
+}
+
+float g1_smith(float VoH, float k) {
+  return VoH / (VoH * (1.0 - k) + k);
+}
+
+// https://de45xmedrsdbp.cloudfront.net/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
+float G_smith(float roughness, float NoV, float NoL) {
+  float k = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
+  return g1_smith(NoL, k) * g1_smith(NoV, k);
+}
+
 // http://igorsklyar.com/system/documents/papers/28/Schlick94.pdf
 float schlick(float f0, float f90, float VoH) {
-  return f0 + (f90 - f0) * pow(1.0 - VoH, 5.0);
+  return f0 + (f90 - f0) * pow(2.0, -5.55473 * VoH + -6.98316 * VoH);
+}
+
+vec3 schlick(const vec3 f0, float VoH) {
+  return f0 + (vec3(1.0) - f0) * pow(2.0, -5.55473 * VoH + -6.98316 * VoH);
 }
 
 // https://disney-animation.s3.amazonaws.com/library/s2012_pbs_disney_brdf_notes_v2.pdf
@@ -111,6 +147,34 @@ float burley_diffuse(float linearRoughness, float NoV, float NoL, float LoH) {
   float viewScatter = schlick(1.0, f90, NoV);
 
   return lightScatter * viewScatter * (1.0 / PI);
+}
+
+float lambert() {
+  return 1.0 / PI;
+}
+
+// ---------------------
+// Indirect lighting
+// ---------------------
+vec3 sphericalHarmonics(const vec3 n) {
+  // Irradiance from "Ditch River" IBL (http://www.hdrlabs.com/sibl/archive.html)
+  return max(
+    vec3(+0.754554516862612, +0.748542953903366, +0.79092151548539) +
+    vec3(-0.083856548007422, +0.092533500963210, +0.322764661032516) * n.y +
+    vec3(+0.308152705331738, +0.366796330467391, +0.466698182999906) * n.z +
+    vec3(-0.188884931542396, -0.277402551592231, -0.377844212327557) * n.x,
+    0.0
+  );
+}
+
+// https://www.unrealengine.com/blog/physically-based-shading-on-mobile
+vec2 envBRDFApprox(float roughness, float NoV) {
+  const vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+  const vec4 c1 = vec4(1.0, 0.0425, 1.040, -0.040);
+  vec4 r = roughness * c0 + c1;
+  float a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
+
+  return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
 // ---------------------
@@ -132,7 +196,7 @@ vec3 render(vec3 ro, vec3 rd, out float dist) {
     vec3 d = normalize(l - h);
     vec3 r = normalize(reflect(rd, n));
 
-    float NoV = abs(dot(n, v)) + 1e-5;
+    float NoV = saturate(dot(n, v));
     float NoL = saturate(dot(n, l));
     float NoH = saturate(dot(n, h));
     float LoH = saturate(dot(l, h));
@@ -142,6 +206,7 @@ vec3 render(vec3 ro, vec3 rd, out float dist) {
     float metallic = 0.0;
 
     float intensity = 2.0;
+    float indirectIntensity = 0.4;
 
     if (material == METAL) {
       roughness = 0.2;
@@ -155,15 +220,40 @@ vec3 render(vec3 ro, vec3 rd, out float dist) {
 
     float linearRoughness = roughness * roughness;
     vec3 diffuseColour = (1.0 - metallic) * baseColor.rgb;
+    vec3 f0 = 0.04 * (1.0 - metallic) + baseColor.rgb * metallic;
 
     // shadows
     float occlusion = shadow(pos, l);
 
-    // Diffuse BRDF
+    // Specular lighting
+    float D = GGX(linearRoughness, NoH, h);
+    float G = G_smith(roughness, NoV, NoL);
+    vec3 F = schlick(f0, LoH);
+    vec3 Fs = (D * G * F) / (4.0 * NoV); // figure out why I can't do NoL * NoV
+
+    // Diffuse lighting
     vec3 Fd = diffuseColour * burley_diffuse(linearRoughness, NoV, NoL, LoH);
 
-    colour = Fd;
+    colour = Fd + Fs;
     colour *= (intensity * occlusion * NoL) * vec3(1.0);
+
+    // Indirect diffuse
+    vec3 indirectDiffuse = sphericalHarmonics(n) * lambert();
+    vec2 indirectHit = trace(pos, r);
+    vec3 indirectSpecular = vec3(0.65, 0.85, 1.0) + r.y * 0.72;
+
+    if (indirectHit.y == CHECKER_MARBLE) {
+      vec3 indirectPos = pos + indirectHit.x * r;
+      float f = mod(floor(6.0 * indirectPos.z) + floor(6.0 * indirectPos.x), 2.0);
+      indirectSpecular = 0.4 + f * vec3(0.6);
+    } else if (indirectHit.y == METAL) {
+      indirectSpecular = vec3(0.2, 0.4, 0.6);
+    }
+
+    vec2 envBRDF = envBRDFApprox(roughness, NoV);
+    vec3 specularColor = f0 * envBRDF.x + envBRDF.y;
+    vec3 ibl = diffuseColour * indirectDiffuse + indirectSpecular * specularColor;
+    colour += ibl * indirectIntensity;
   }
 
   return colour;
