@@ -1,15 +1,10 @@
 precision highp float;
 
-#define PI 3.14159265359
 #define saturate(x) clamp(x, 0.0, 1.0)
+#define PI 3.14159265359
 
-uniform float diffuseIntensity;
+varying vec3 fragNormal, fragPosition;
 uniform vec3 lightDir;
-uniform vec2 resolution;
-uniform float time;
-
-varying vec3 vNormal;
-varying vec4 vPosition, normCamSpace;
 
 // ----------
 // BRDFs
@@ -36,14 +31,15 @@ vec3 schlick(const vec3 f0, float VoH) {
   return f0 + (vec3(1.0) - f0) * pow(2.0, -5.55473 * VoH + -6.98316 * VoH);
 }
 
-// -----------
-// Rendering
-// -----------
+float lambert() {
+  return 1.0 / PI;
+}
+
 vec3 render() {
-  vec3 colour = vec3(0.0);
-  vec3 n = vNormal;
+  vec3 baseColour = vec3(0.9, 0.1, 0.3);
+  vec3 v = normalize(-fragPosition);
+  vec3 n = normalize(fragNormal);
   vec3 l = normalize(lightDir);
-  vec3 v = normalize(-vPosition.xyz);
   vec3 h = normalize(v + l);
   vec3 d = normalize(l - h);
 
@@ -52,16 +48,11 @@ vec3 render() {
   float NoH = saturate(dot(n, h));
   float LoH = saturate(dot(l, h));
 
-  vec3 baseColour = mix(
-    vec3(0.0, 0.1, 0.40),
-    vec3(0.0, 0.2, 0.35),
-    dot(vNormal, normCamSpace.xyz)
-  );
-  float roughness = 0.6;
-  float linearRoughness = roughness * roughness;
   vec3 f0 = baseColour + 0.04;
+  float roughness = 0.2;
+  float linearRoughness = roughness * roughness;
+  float indirectIntensity = 0.5;
 
-  // diffuse
   vec3 Fd = baseColour * NoL;
 
   // specular
@@ -70,14 +61,15 @@ vec3 render() {
   vec3 F = schlick(f0, LoH);
   vec3 Fs = (D * G * F) / (4.0 * NoL);
 
-  colour = Fd + Fs;
+  vec3 colour = Fd + Fs;
+
+  // indirect
+  vec3 indirectDiffuse = lambert() * baseColour;
+  colour += baseColour * indirectDiffuse * indirectIntensity;
 
   return colour;
 }
 
-// -----------
-// Setup
-// -----------
 void main() {
   vec3 colour = render();
 

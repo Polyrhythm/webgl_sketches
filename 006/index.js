@@ -47,6 +47,10 @@ const elements = regl.elements({
   data: elementData,
 });
 
+function createFBM() {
+
+}
+
 const drawScene = regl({
   vert: glsl.file('./vert.glsl'),
   frag: glsl.file('./frag.glsl'),

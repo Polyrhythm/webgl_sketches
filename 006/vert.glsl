@@ -7,7 +7,7 @@ precision highp float;
 
 attribute vec2 xzPosition;
 varying vec3 vNormal;
-varying vec4 vPosition;
+varying vec4 vPosition, normCamSpace;
 
 uniform mat4 projection, view;
 uniform float time;
@@ -38,6 +38,7 @@ void main() {
   vec3 xyzPosition = getPos(xzPosition);
   vPosition = view * vec4(xyzPosition, 1.0);
   vNormal = getNormal(xzPosition);
+  normCamSpace = normalize(view * vec4(vNormal, 0.0));
 
   gl_Position = projection * view * vec4(xyzPosition, 1.0);
 }
