@@ -3,43 +3,40 @@ precision highp float;
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PI 3.14159265359
 
+const int NUM_LIGHTS = 2;
+
 varying vec3 fragNormal, fragPosition;
-uniform vec3 lightDir;
+struct Light {
+  vec3 position;
+  vec3 colour;
+  float intensity;
+};
+
+uniform Light lights[NUM_LIGHTS];
 
 // ----------
 // BRDFs
 // ----------
-float g1_smith(float VoH, float k) {
-  return VoH / (VoH * (1.0 - k) + k);
+vec3 realtimeSpec(
+  const float shininess,
+  const float NoH,
+  const float NoL,
+  const vec3 specularColour) {
+  float t1 = (shininess + 8.0) / (8.0 * PI);
+  float t2 = pow(NoH, shininess);
+  vec3 t3 = specularColour * NoL;
+
+  return t1 * t2 * t3;
 }
 
-float G_smith(float roughness, float NoV, float NoL) {
-  float k = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
-  return g1_smith(NoL, k) * g1_smith(NoV, k);
-}
-
-float GGX(float linearRoughness, float NoH, const vec3 h) {
-  float oneMinusNoHSquared = 1.0 - NoH * NoH;
-  float a = NoH * linearRoughness;
-  float k = linearRoughness / (oneMinusNoHSquared + a * a);
-  float d = k * k * (1.0 / PI);
-
-  return d;
-}
-
-vec3 schlick(const vec3 f0, float VoH) {
-  return f0 + (vec3(1.0) - f0) * pow(2.0, -5.55473 * VoH + -6.98316 * VoH);
-}
-
-float lambert() {
-  return 1.0 / PI;
-}
-
-vec3 render() {
+// ------------
+// render
+// ------------
+vec3 render(vec3 colour, Light light) {
   vec3 baseColour = vec3(0.9, 0.1, 0.3);
   vec3 v = normalize(-fragPosition);
   vec3 n = normalize(fragNormal);
-  vec3 l = normalize(lightDir);
+  vec3 l = normalize(light.position - fragPosition);
   vec3 h = normalize(v + l);
   vec3 d = normalize(l - h);
 
@@ -49,29 +46,21 @@ vec3 render() {
   float LoH = saturate(dot(l, h));
 
   vec3 f0 = baseColour + 0.04;
-  float roughness = 0.2;
-  float linearRoughness = roughness * roughness;
-  float indirectIntensity = 0.5;
-
-  vec3 Fd = baseColour * NoL;
+  float shininess = 80.0;
 
   // specular
-  float D = GGX(linearRoughness, NoH, h);
-  float G = G_smith(roughness, NoV, NoL);
-  vec3 F = schlick(f0, LoH);
-  vec3 Fs = (D * G * F) / (4.0 * NoL);
+  vec3 Fs = realtimeSpec(shininess, NoH, NoL, f0);
 
-  vec3 colour = Fd + Fs;
-
-  // indirect
-  vec3 indirectDiffuse = lambert() * baseColour;
-  colour += baseColour * indirectDiffuse * indirectIntensity;
+  colour += (baseColour / PI + Fs) * light.colour * light.intensity * NoL;
 
   return colour;
 }
 
 void main() {
-  vec3 colour = render();
+  vec3 colour = vec3(0.0);
+  for (int i = 0; i < NUM_LIGHTS; i++) {
+    colour += render(colour, lights[i]);
+  }
 
   gl_FragColor = vec4(colour, 1.0);
 }
