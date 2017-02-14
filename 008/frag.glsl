@@ -1,115 +1,114 @@
 precision highp float;
 
+#pragma glslify: cnoise2 = require('glsl-noise/classic/2d')
+
 uniform float iGlobalTime;
 uniform vec2 iResolution;
 
+#define saturate(x) clamp(x, 0.0, 1.0)
+const vec3 SUN_DIR = vec3(0.0, 1.0, 0.0);
+
 // ---------------
-// noise
+// terrain
 // ---------------
-const float h1 = 0.3183099;
-float hash1(vec3 p) {
-  p = 50.0 * fract(p * h1);
-
-  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+float terrainMap(vec2 pos) {
+  float time = iGlobalTime / 5.0;
+  return cnoise2(pos + time) + sin(iGlobalTime * 0.5) * pos.y * pos.x * 0.02;
 }
 
-float hash1(float n) {
-  return fract(n * 17.0 * fract(n * h1));
-}
+// ---------------
+// raytrace
+// ---------------
+bool trace(vec3 ro, vec3 rd, out float resT) {
+  const float delta = 0.05;
+  const float minT = 0.005;
+  const float maxT = 30.0;
 
-vec4 noised(vec3 x) {
-  vec3 p = floor(x);
-  vec3 w = fract(x);
-
-  vec3 u = w * w * w * (w * (w * 6.0 - 15.0) + 10.0);
-  vec3 du = 30.0 * w * w * (w * (w - 2.0) + 1.0);
-
-  float a = hash1(p + vec3(0.0, 0.0, 0.0));
-  float b = hash1(p + vec3(1.0, 0.0, 0.0));
-  float c = hash1(p + vec3(0.0, 1.0, 0.0));
-  float d = hash1(p + vec3(1.0, 1.0, 0.0));
-  float e = hash1(p + vec3(0.0, 0.0, 1.0));
-  float f = hash1(p + vec3(1.0, 0.0, 1.0));
-  float g = hash1(p + vec3(0.0, 1.0, 1.0));
-  float h = hash1(p + vec3(1.0, 1.0, 1.0));
-
-  float k0 =  a;
-  float k1 =  b - a;
-  float k2 =  c - a;
-  float k3 =  e - a;
-  float k4 =  a - b - c + d;
-  float k5 =  a - c - e + g;
-  float k6 =  a - b - e + f;
-  float k7 = -a + b + c - d + e - f - g + h;
-
-  return vec4(-1.0 + 2.0 * (k0 + k1 * u.x + k2 * u.y + k3 * u.z + k4 * u.x * u.y + k5 * u.y * u.z + k6 * u.z * u.x + k7 * u.x * u.y * u.z),
-                     2.0 * du * vec3(k1 + k4 * u.y + k6 * u.z + k7 * u.y * u.z,
-                                     k2 + k5 * u.z + k4 * u.x + k7 * u.z * u.x,
-                                     k3 + k6 * u.x + k5 * u.y + k7 * u.x * u.y));
-}
-
-const mat3 m3 = mat3(+0.00, +0.80, +0.60,
-                     -0.80, +0.36, -0.48,
-                     -0.60, -0.48, +0.64);
-const mat3 m3i = mat3(+0.00, -0.80, -0.60,
-                      +0.80, +0.36, -0.48,
-                      +0.60, -0.48, +0.64);
-
-vec4 fbm(vec3 x, int octaves) {
-  const float w = 2.0;
-  const float s = 0.5;
-  float a = 0.0;
-  float b = 0.5;
-  vec3 d = vec3(0.0);
-  mat3 m = mat3(1.0, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.0, 0.0, 1.0);
-
-  for (int i = 0; i < octaves; i++) {
-    vec4 n = noised(x);
-    a += b * n.x;
-    d += b * m * n.yzw;
-    b *= s;
-    x = w * m3 * x;
-    m = w * m3i * m;
+  for (float t = minT; t < maxT; t += delta) {
+    vec3 p = ro + rd * t;
+    if (p.y < terrainMap(vec2(p.x, p.z))) {
+      resT = t - 0.5 * delta;
+      return true;
+    }
   }
 
-  return vec4(a, d);
+  return false;
+}
+
+vec3 getNormal(const vec3 pos) {
+  const float epsilon = 0.02;
+  vec3 n = vec3(terrainMap(vec2(pos.x - epsilon, pos.z)) - terrainMap(vec2(pos.x + epsilon, pos.z)),
+                      2.0 * epsilon,
+                      terrainMap(vec2(pos.x, pos.z - epsilon)) - terrainMap(vec2(pos.x, pos.z + epsilon)));
+
+  return normalize(n);
 }
 
 // ---------------
-// Sky
+// render
 // ---------------
 vec3 renderSky(vec3 ro, vec3 rd) {
-  const float brightness = 0.9;
-  vec3 skyColour = brightness * vec3(0.4, 0.65, 1.0) - rd.y * vec3(0.4, 0.36, 0.4);
+  vec3 col = 0.9 * vec3(0.4, 0.65, 1.0) - rd.y * vec3(0.4, 0.36, 0.4);
 
-  return skyColour;
+  return col;
+}
+
+vec3 getMaterial(vec3 pos, vec3 n) {
+  return vec3(0.2, 0.8, 0.1);
+}
+
+float getShading(vec3 pos, vec3 n) {
+  return saturate(dot(SUN_DIR, n));
+}
+
+vec3 applyFog(vec3 colour, float dist) {
+  float fogAmount = 1.0 - exp(-dist * colour.z);
+  vec3 fogColour = vec3(0.5, 0.6, 0.7);
+  return mix(colour, fogColour, fogAmount);
+}
+
+vec3 terrainColour(vec3 ro, vec3 rd, float resT) {
+  vec3 pos = ro + rd * resT;
+  vec3 n = getNormal(pos);
+  float s = getShading(pos, n);
+  vec3 m = getMaterial(pos, n);
+
+  return applyFog(m * s, resT);
+}
+
+vec3 render(vec3 ro, vec3 rd) {
+  float resT;
+  vec3 col = vec3(0.0);
+  if (trace(ro, rd, resT)) {
+    col = terrainColour(ro, rd, resT);
+  } else {
+    col = renderSky(ro, rd);
+  }
+
+  return col;
 }
 
 // ---------------
 // Setup
 // ---------------
 mat3 setCamera(in vec3 origin, in vec3 target, float rotation) {
-  vec3 forward = normalize(target - origin);
-  vec3 orientation = vec3(sin(rotation), cos(rotation), 0.0);
-  vec3 left = normalize(cross(forward, orientation));
-  vec3 up = normalize(cross(left, forward));
-  return mat3(left, up, forward);
+    vec3 forward = normalize(target - origin);
+    vec3 orientation = vec3(sin(rotation), cos(rotation), 0.0);
+    vec3 left = normalize(cross(forward, orientation));
+    vec3 up = normalize(cross(left, forward));
+    return mat3(left, up, forward);
 }
 
 void main() {
-  vec2 p = 1.0 - 2.0 * (gl_FragCoord.xy / iResolution.xy);
+  vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy;
   p *= iResolution.xy / iResolution.y;
-  vec3 colour = vec3(p.x, p.y, 0.0);
 
-  vec3 origin = vec3(0.0, 1.0, 1.7);
-  vec3 target = vec3(0.0);
-
+  vec3 origin = vec3(0.0, 3.0, -17.0);
+  vec3 target = vec3(0.0, 0.0, 0.0);
   mat3 toWorld = setCamera(origin, target, 0.0);
   vec3 rd = toWorld * normalize(vec3(p.xy, 1.25));
 
-  colour = renderSky(origin, rd);
+  vec3 colour = render(origin, rd);
 
   gl_FragColor = vec4(colour, 1.0);
 }
