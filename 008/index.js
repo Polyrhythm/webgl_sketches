@@ -1,5 +1,9 @@
 const regl = require('regl')();
 const glsl = require('glslify');
+const createFPS = require('fps-indicator');
+
+let fps = createFPS();
+fps.element.style.color = 'white';
 
 const vertices = [
   -1, -1, 0,

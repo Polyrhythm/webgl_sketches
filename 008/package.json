@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "budo index.js --open --live --host localhost -- -t es2040 -t glslify",
+    "start": "budo index.js --open --live --host localhost --force-default-index true -- -t es2040 -t glslify",
     "build": "browserify index.js -t es2040 -t glslify | indexhtmlify > index.html"
   },
   "keywords": [],
@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "angle-normals": "^1.0.0",
+    "fps-indicator": "^1.0.2",
     "gl-mat4": "^1.1.4",
     "gl-vec3": "^1.0.3",
     "glsl-noise": "0.0.0",

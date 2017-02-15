@@ -9,13 +9,17 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var regl = require('regl')();
 var glsl = require('glslify');
+var createFPS = require('fps-indicator');
+
+var fps = createFPS();
+fps.element.style.color = 'white';
 
 var vertices = [-1, -1, 0, -1, +1, 0, +1, +1, 0, +1, -1, 0];
 
 var indices = [0, 1, 2, 0, 2, 3];
 
 var drawScene = regl({
-  frag: glsl(["precision highp float;\n#define GLSLIFY 1\n\n//\n// GLSL textureless classic 2D noise \"cnoise\",\n// with an RSL-style periodic variant \"pnoise\".\n// Author:  Stefan Gustavson (stefan.gustavson@liu.se)\n// Version: 2011-08-22\n//\n// Many thanks to Ian McEwan of Ashima Arts for the\n// ideas for permutation and gradient selection.\n//\n// Copyright (c) 2011 Stefan Gustavson. All rights reserved.\n// Distributed under the MIT license. See LICENSE file.\n// https://github.com/ashima/webgl-noise\n//\n\nvec4 mod289(vec4 x)\n{\n  return x - floor(x * (1.0 / 289.0)) * 289.0;\n}\n\nvec4 permute(vec4 x)\n{\n  return mod289(((x*34.0)+1.0)*x);\n}\n\nvec4 taylorInvSqrt(vec4 r)\n{\n  return 1.79284291400159 - 0.85373472095314 * r;\n}\n\nvec2 fade(vec2 t) {\n  return t*t*t*(t*(t*6.0-15.0)+10.0);\n}\n\n// Classic Perlin noise\nfloat cnoise(vec2 P)\n{\n  vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);\n  vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);\n  Pi = mod289(Pi); // To avoid truncation effects in permutation\n  vec4 ix = Pi.xzxz;\n  vec4 iy = Pi.yyww;\n  vec4 fx = Pf.xzxz;\n  vec4 fy = Pf.yyww;\n\n  vec4 i = permute(permute(ix) + iy);\n\n  vec4 gx = fract(i * (1.0 / 41.0)) * 2.0 - 1.0 ;\n  vec4 gy = abs(gx) - 0.5 ;\n  vec4 tx = floor(gx + 0.5);\n  gx = gx - tx;\n\n  vec2 g00 = vec2(gx.x,gy.x);\n  vec2 g10 = vec2(gx.y,gy.y);\n  vec2 g01 = vec2(gx.z,gy.z);\n  vec2 g11 = vec2(gx.w,gy.w);\n\n  vec4 norm = taylorInvSqrt(vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11)));\n  g00 *= norm.x;\n  g01 *= norm.y;\n  g10 *= norm.z;\n  g11 *= norm.w;\n\n  float n00 = dot(g00, vec2(fx.x, fy.x));\n  float n10 = dot(g10, vec2(fx.y, fy.y));\n  float n01 = dot(g01, vec2(fx.z, fy.z));\n  float n11 = dot(g11, vec2(fx.w, fy.w));\n\n  vec2 fade_xy = fade(Pf.xy);\n  vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);\n  float n_xy = mix(n_x.x, n_x.y, fade_xy.y);\n  return 2.3 * n_xy;\n}\n\nuniform float iGlobalTime;\nuniform vec2 iResolution;\n\n#define saturate(x) clamp(x, 0.0, 1.0)\nconst vec3 SUN_DIR = vec3(0.0, 1.0, 0.0);\n\n// ---------------\n// terrain\n// ---------------\nfloat terrainMap(vec2 pos) {\n  float time = iGlobalTime / 5.0;\n  return cnoise(pos + time) + sin(iGlobalTime * 0.5) * pos.y * pos.x * 0.02;\n}\n\n// ---------------\n// raytrace\n// ---------------\nbool trace(vec3 ro, vec3 rd, out float resT) {\n  const float delta = 0.05;\n  const float minT = 0.005;\n  const float maxT = 30.0;\n\n  for (float t = minT; t < maxT; t += delta) {\n    vec3 p = ro + rd * t;\n    if (p.y < terrainMap(vec2(p.x, p.z))) {\n      resT = t - 0.5 * delta;\n      return true;\n    }\n  }\n\n  return false;\n}\n\nvec3 getNormal(const vec3 pos) {\n  const float epsilon = 0.02;\n  vec3 n = vec3(terrainMap(vec2(pos.x - epsilon, pos.z)) - terrainMap(vec2(pos.x + epsilon, pos.z)),\n                      2.0 * epsilon,\n                      terrainMap(vec2(pos.x, pos.z - epsilon)) - terrainMap(vec2(pos.x, pos.z + epsilon)));\n\n  return normalize(n);\n}\n\n// ---------------\n// render\n// ---------------\nvec3 renderSky(vec3 ro, vec3 rd) {\n  vec3 col = 0.9 * vec3(0.4, 0.65, 1.0) - rd.y * vec3(0.4, 0.36, 0.4);\n\n  return col;\n}\n\nvec3 getMaterial(vec3 pos, vec3 n) {\n  return vec3(0.2, 0.8, 0.1);\n}\n\nfloat getShading(vec3 pos, vec3 n) {\n  return saturate(dot(SUN_DIR, n));\n}\n\nvec3 applyFog(vec3 colour, float dist) {\n  float fogAmount = 1.0 - exp(-dist * colour.z);\n  vec3 fogColour = vec3(0.5, 0.6, 0.7);\n  return mix(colour, fogColour, fogAmount);\n}\n\nvec3 terrainColour(vec3 ro, vec3 rd, float resT) {\n  vec3 pos = ro + rd * resT;\n  vec3 n = getNormal(pos);\n  float s = getShading(pos, n);\n  vec3 m = getMaterial(pos, n);\n\n  return applyFog(m * s, resT);\n}\n\nvec3 render(vec3 ro, vec3 rd) {\n  float resT;\n  vec3 col = vec3(0.0);\n  if (trace(ro, rd, resT)) {\n    col = terrainColour(ro, rd, resT);\n  } else {\n    col = renderSky(ro, rd);\n  }\n\n  return col;\n}\n\n// ---------------\n// Setup\n// ---------------\nmat3 setCamera(in vec3 origin, in vec3 target, float rotation) {\n    vec3 forward = normalize(target - origin);\n    vec3 orientation = vec3(sin(rotation), cos(rotation), 0.0);\n    vec3 left = normalize(cross(forward, orientation));\n    vec3 up = normalize(cross(left, forward));\n    return mat3(left, up, forward);\n}\n\nvoid main() {\n  vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy;\n  p *= iResolution.xy / iResolution.y;\n\n  vec3 origin = vec3(0.0, 3.0, -17.0);\n  vec3 target = vec3(0.0, 0.0, 0.0);\n  mat3 toWorld = setCamera(origin, target, 0.0);\n  vec3 rd = toWorld * normalize(vec3(p.xy, 1.25));\n\n  vec3 colour = render(origin, rd);\n\n  gl_FragColor = vec4(colour, 1.0);\n}\n"]),
+  frag: glsl(["precision highp float;\n#define GLSLIFY 1\n\n//\n// GLSL textureless classic 2D noise \"cnoise\",\n// with an RSL-style periodic variant \"pnoise\".\n// Author:  Stefan Gustavson (stefan.gustavson@liu.se)\n// Version: 2011-08-22\n//\n// Many thanks to Ian McEwan of Ashima Arts for the\n// ideas for permutation and gradient selection.\n//\n// Copyright (c) 2011 Stefan Gustavson. All rights reserved.\n// Distributed under the MIT license. See LICENSE file.\n// https://github.com/ashima/webgl-noise\n//\n\nvec4 mod289(vec4 x)\n{\n  return x - floor(x * (1.0 / 289.0)) * 289.0;\n}\n\nvec4 permute(vec4 x)\n{\n  return mod289(((x*34.0)+1.0)*x);\n}\n\nvec4 taylorInvSqrt(vec4 r)\n{\n  return 1.79284291400159 - 0.85373472095314 * r;\n}\n\nvec2 fade(vec2 t) {\n  return t*t*t*(t*(t*6.0-15.0)+10.0);\n}\n\n// Classic Perlin noise\nfloat cnoise(vec2 P)\n{\n  vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);\n  vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);\n  Pi = mod289(Pi); // To avoid truncation effects in permutation\n  vec4 ix = Pi.xzxz;\n  vec4 iy = Pi.yyww;\n  vec4 fx = Pf.xzxz;\n  vec4 fy = Pf.yyww;\n\n  vec4 i = permute(permute(ix) + iy);\n\n  vec4 gx = fract(i * (1.0 / 41.0)) * 2.0 - 1.0 ;\n  vec4 gy = abs(gx) - 0.5 ;\n  vec4 tx = floor(gx + 0.5);\n  gx = gx - tx;\n\n  vec2 g00 = vec2(gx.x,gy.x);\n  vec2 g10 = vec2(gx.y,gy.y);\n  vec2 g01 = vec2(gx.z,gy.z);\n  vec2 g11 = vec2(gx.w,gy.w);\n\n  vec4 norm = taylorInvSqrt(vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11)));\n  g00 *= norm.x;\n  g01 *= norm.y;\n  g10 *= norm.z;\n  g11 *= norm.w;\n\n  float n00 = dot(g00, vec2(fx.x, fy.x));\n  float n10 = dot(g10, vec2(fx.y, fy.y));\n  float n01 = dot(g01, vec2(fx.z, fy.z));\n  float n11 = dot(g11, vec2(fx.w, fy.w));\n\n  vec2 fade_xy = fade(Pf.xy);\n  vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);\n  float n_xy = mix(n_x.x, n_x.y, fade_xy.y);\n  return 2.3 * n_xy;\n}\n\nuniform float iGlobalTime;\nuniform vec2 iResolution;\n\n#define saturate(x) clamp(x, 0.0, 1.0)\nconst vec3 SUN_DIR = vec3(0.0, 1.0, 0.0);\n\n// ---------------\n// terrain\n// ---------------\nfloat terrainMap(vec2 pos) {\n  float time = iGlobalTime / 5.0;\n  return cnoise(pos + time);\n}\n\n// ---------------\n// raytrace\n// ---------------\nfloat trace(vec3 ro, vec3 rd) {\n  float dist, th;\n  const int MAX_STEPS = 400;\n  const float minT = 5.0;\n  const float maxT = 100.0;\n  float t = minT;\n  float origT = t;\n  float origDist = 0.0;\n\n  for (int i = 0; i < MAX_STEPS; i++) {\n    th = 0.001 * t;\n    vec3 p = ro + rd * t;\n    float env = terrainMap(p.xz);\n    dist = p.y - env;\n    if (dist < th) {\n      break;\n    }\n\n    origT = t;\n    origDist = dist;\n    t += 0.01 * t;\n\n    if (t > maxT) break;\n  }\n\n  if (t > maxT) return -1.0;\n\n  return origT + (th - origDist) * (t - origT) / (dist - origDist);\n}\n\nvec3 getNormal(const vec3 pos) {\n  const float epsilon = 0.02;\n  vec3 n = vec3(terrainMap(vec2(pos.x - epsilon, pos.z)) - terrainMap(vec2(pos.x + epsilon, pos.z)),\n                2.0 * epsilon,\n                terrainMap(vec2(pos.x, pos.z - epsilon)) - terrainMap(vec2(pos.x, pos.z + epsilon)));\n\n  return normalize(n);\n}\n\n// ---------------\n// render\n// ---------------\nvec3 renderSky(vec3 ro, vec3 rd) {\n  vec3 col = 0.9 * vec3(0.4, 0.65, 1.0) - rd.y * vec3(0.4, 0.36, 0.4);\n\n  return col;\n}\n\nvec3 getMaterial(vec3 pos, vec3 n) {\n  return vec3(0.2, 0.8, 0.1);\n}\n\nfloat getShading(vec3 pos, vec3 n) {\n  return saturate(dot(SUN_DIR, n));\n}\n\nvec3 applyFog(vec3 colour, float dist) {\n  float fogAmount = 1.0 - exp(-dist * colour.z);\n  vec3 fogColour = vec3(0.5, 0.6, 0.7);\n  return mix(colour, fogColour, fogAmount);\n}\n\nvec3 terrainColour(vec3 ro, vec3 rd, float resT) {\n  vec3 pos = ro + rd * resT;\n  vec3 n = getNormal(pos);\n  float s = getShading(pos, n);\n  vec3 m = getMaterial(pos, n);\n\n  return applyFog(m * s, resT);\n}\n\nvec3 render(vec3 ro, vec3 rd) {\n  vec3 col = vec3(0.0);\n  float t = trace(ro, rd);\n  if (t != -1.0) {\n    col = terrainColour(ro, rd, t);\n  } else {\n    col = renderSky(ro, rd);\n  }\n\n  return col;\n}\n\n// ---------------\n// Setup\n// ---------------\nmat3 setCamera(in vec3 origin, in vec3 target, float rotation) {\n    vec3 forward = normalize(target - origin);\n    vec3 orientation = vec3(sin(rotation), cos(rotation), 0.0);\n    vec3 left = normalize(cross(forward, orientation));\n    vec3 up = normalize(cross(left, forward));\n    return mat3(left, up, forward);\n}\n\nvoid main() {\n  vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy;\n  p *= iResolution.xy / iResolution.y;\n\n  vec3 origin = vec3(0.0, 5.0, -17.0);\n  vec3 target = vec3(0.0, 0.0, 0.0);\n  mat3 toWorld = setCamera(origin, target, 0.0);\n  vec3 rd = toWorld * normalize(vec3(p.xy, 1.25));\n\n  vec3 colour = render(origin, rd);\n\n  gl_FragColor = vec4(colour, 1.0);\n}\n"]),
   vert: glsl(["#define GLSLIFY 1\nattribute vec3 position;\n\nvoid main() {\n  gl_Position = vec4(position, 1.0);\n}\n"]),
   attributes: {
     position: vertices
@@ -38,7 +42,117 @@ regl.frame(function () {
 
   drawScene();
 });
-},{"glslify":2,"regl":3}],2:[function(require,module,exports){
+},{"fps-indicator":2,"glslify":3,"regl":7}],2:[function(require,module,exports){
+/**
+ * @module fps-indicator
+ */
+
+const raf = require('raf');
+const now = require('right-now');
+
+module.exports = fps;
+
+
+
+function fps (opts) {
+	if (!(this instanceof fps)) return new fps(opts);
+
+	opts = opts || {};
+
+	if (opts.container) {
+		if (typeof opts.container === 'string') {
+			this.container = document.querySelector(opts.container);
+		}
+		else {
+			this.container = opts.container;
+		}
+	}
+	else {
+		this.container = document.body || document.documentElement;
+	}
+
+	//init fps
+	this.element = document.createElement('div');
+	this.element.classList.add('fps');
+	this.element.innerHTML = `
+		<div class="fps-bg"></div>
+		<canvas class="fps-canvas"></canvas>
+		<span class="fps-text">fps <span class="fps-value">60.0</span></span>
+	`;
+	this.container.appendChild(this.element);
+
+	this.canvas = this.element.querySelector('.fps-canvas');
+	this.textEl = this.element.querySelector('.fps-text');
+	this.valueEl = this.element.querySelector('.fps-value');
+	this.bgEl = this.element.querySelector('.fps-bg');
+
+	this.element.style.cssText = `
+		line-height: 1;
+		position: absolute;
+		z-index: 1;
+		top: 0;
+		right: 0;
+	`;
+
+	this.canvas.style.cssText = `
+		position: relative;
+		width: 2em;
+		height: 1em;
+		display: block;
+		float: left;
+		margin-right: .333em;
+	`;
+
+	this.bgEl.style.cssText = `
+		position: absolute;
+		height: 1em;
+		width: 2em;
+		background: currentcolor;
+		opacity: .1;
+	`;
+
+	this.canvas.width = parseInt(getComputedStyle(this.canvas).width) || 1;
+	this.canvas.height = parseInt(getComputedStyle(this.canvas).height) || 1;
+
+	this.context = this.canvas.getContext('2d');
+
+	let ctx = this.context;
+	let w = this.canvas.width;
+	let h = this.canvas.height;
+	let count = 0;
+	let lastTime = 0;
+	let values = opts.values || Array(this.canvas.width);
+	let updatePeriod = opts.updatePeriod || 1000;
+	let maxFps = opts.maxFps || 100;
+
+	//enable update routine
+	let that = this;
+	raf(function measure () {
+		count++;
+		let t = now();
+
+		if (t - lastTime > updatePeriod) {
+			let color = that.color;
+			lastTime = t;
+			values.push(count / (maxFps * updatePeriod * 0.001));
+			values = values.slice(-w);
+			count = 0;
+
+			ctx.clearRect(0, 0, w, h);
+			ctx.fillStyle = getComputedStyle(that.canvas).color;
+			for (let i = w; i--;) {
+				let value = values[i];
+				if (value == null) break;
+				ctx.fillRect(i, h - h * value, 1, h * value);
+			}
+
+			that.valueEl.innerHTML = (values[values.length - 1]*maxFps).toFixed(1);
+		}
+
+		raf(measure);
+	});
+}
+},{"raf":6,"right-now":8}],3:[function(require,module,exports){
 module.exports = function(strings) {
   if (typeof strings === 'string') strings = [strings]
   var exprs = [].slice.call(arguments,1)
@@ -50,7 +164,301 @@ module.exports = function(strings) {
   return parts.join('')
 }
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
+(function (process){
+// Generated by CoffeeScript 1.7.1
+(function() {
+  var getNanoSeconds, hrtime, loadTime;
+
+  if ((typeof performance !== "undefined" && performance !== null) && performance.now) {
+    module.exports = function() {
+      return performance.now();
+    };
+  } else if ((typeof process !== "undefined" && process !== null) && process.hrtime) {
+    module.exports = function() {
+      return (getNanoSeconds() - loadTime) / 1e6;
+    };
+    hrtime = process.hrtime;
+    getNanoSeconds = function() {
+      var hr;
+      hr = hrtime();
+      return hr[0] * 1e9 + hr[1];
+    };
+    loadTime = getNanoSeconds();
+  } else if (Date.now) {
+    module.exports = function() {
+      return Date.now() - loadTime;
+    };
+    loadTime = Date.now();
+  } else {
+    module.exports = function() {
+      return new Date().getTime() - loadTime;
+    };
+    loadTime = new Date().getTime();
+  }
+
+}).call(this);
+
+}).call(this,require('_process'))
+},{"_process":5}],5:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],6:[function(require,module,exports){
+(function (global){
+var now = require('performance-now')
+  , root = typeof window === 'undefined' ? global : window
+  , vendors = ['moz', 'webkit']
+  , suffix = 'AnimationFrame'
+  , raf = root['request' + suffix]
+  , caf = root['cancel' + suffix] || root['cancelRequest' + suffix]
+
+for(var i = 0; !raf && i < vendors.length; i++) {
+  raf = root[vendors[i] + 'Request' + suffix]
+  caf = root[vendors[i] + 'Cancel' + suffix]
+      || root[vendors[i] + 'CancelRequest' + suffix]
+}
+
+// Some versions of FF have rAF but not cAF
+if(!raf || !caf) {
+  var last = 0
+    , id = 0
+    , queue = []
+    , frameDuration = 1000 / 60
+
+  raf = function(callback) {
+    if(queue.length === 0) {
+      var _now = now()
+        , next = Math.max(0, frameDuration - (_now - last))
+      last = next + _now
+      setTimeout(function() {
+        var cp = queue.slice(0)
+        // Clear queue here to prevent
+        // callbacks from appending listeners
+        // to the current frame's queue
+        queue.length = 0
+        for(var i = 0; i < cp.length; i++) {
+          if(!cp[i].cancelled) {
+            try{
+              cp[i].callback(last)
+            } catch(e) {
+              setTimeout(function() { throw e }, 0)
+            }
+          }
+        }
+      }, Math.round(next))
+    }
+    queue.push({
+      handle: ++id,
+      callback: callback,
+      cancelled: false
+    })
+    return id
+  }
+
+  caf = function(handle) {
+    for(var i = 0; i < queue.length; i++) {
+      if(queue[i].handle === handle) {
+        queue[i].cancelled = true
+      }
+    }
+  }
+}
+
+module.exports = function(fn) {
+  // Wrap in a new function to prevent
+  // `cancel` potentially being assigned
+  // to the native rAF function
+  return raf.call(root, fn)
+}
+module.exports.cancel = function() {
+  caf.apply(root, arguments)
+}
+module.exports.polyfill = function() {
+  root.requestAnimationFrame = raf
+  root.cancelAnimationFrame = caf
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"performance-now":4}],7:[function(require,module,exports){
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
 	typeof define === 'function' && define.amd ? define(factory) :
@@ -9555,6 +9963,17 @@ return wrapREGL;
 })));
 
 
+},{}],8:[function(require,module,exports){
+(function (global){
+module.exports =
+  global.performance &&
+  global.performance.now ? function now() {
+    return performance.now()
+  } : Date.now || function now() {
+    return +new Date
+  }
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}]},{},[1]);
 </script>
 </html>

@@ -13,33 +13,47 @@ const vec3 SUN_DIR = vec3(0.0, 1.0, 0.0);
 // ---------------
 float terrainMap(vec2 pos) {
   float time = iGlobalTime / 5.0;
-  return cnoise2(pos + time) + sin(iGlobalTime * 0.5) * pos.y * pos.x * 0.02;
+  return cnoise2(pos + time);
 }
 
 // ---------------
 // raytrace
 // ---------------
-bool trace(vec3 ro, vec3 rd, out float resT) {
-  const float delta = 0.05;
-  const float minT = 0.005;
-  const float maxT = 30.0;
+float trace(vec3 ro, vec3 rd) {
+  float dist, th;
+  const int MAX_STEPS = 400;
+  const float minT = 5.0;
+  const float maxT = 100.0;
+  float t = minT;
+  float origT = t;
+  float origDist = 0.0;
 
-  for (float t = minT; t < maxT; t += delta) {
+  for (int i = 0; i < MAX_STEPS; i++) {
+    th = 0.001 * t;
     vec3 p = ro + rd * t;
-    if (p.y < terrainMap(vec2(p.x, p.z))) {
-      resT = t - 0.5 * delta;
-      return true;
+    float env = terrainMap(p.xz);
+    dist = p.y - env;
+    if (dist < th) {
+      break;
     }
+
+    origT = t;
+    origDist = dist;
+    t += 0.01 * t;
+
+    if (t > maxT) break;
   }
 
-  return false;
+  if (t > maxT) return -1.0;
+
+  return origT + (th - origDist) * (t - origT) / (dist - origDist);
 }
 
 vec3 getNormal(const vec3 pos) {
   const float epsilon = 0.02;
   vec3 n = vec3(terrainMap(vec2(pos.x - epsilon, pos.z)) - terrainMap(vec2(pos.x + epsilon, pos.z)),
-                      2.0 * epsilon,
-                      terrainMap(vec2(pos.x, pos.z - epsilon)) - terrainMap(vec2(pos.x, pos.z + epsilon)));
+                2.0 * epsilon,
+                terrainMap(vec2(pos.x, pos.z - epsilon)) - terrainMap(vec2(pos.x, pos.z + epsilon)));
 
   return normalize(n);
 }
@@ -77,10 +91,10 @@ vec3 terrainColour(vec3 ro, vec3 rd, float resT) {
 }
 
 vec3 render(vec3 ro, vec3 rd) {
-  float resT;
   vec3 col = vec3(0.0);
-  if (trace(ro, rd, resT)) {
-    col = terrainColour(ro, rd, resT);
+  float t = trace(ro, rd);
+  if (t != -1.0) {
+    col = terrainColour(ro, rd, t);
   } else {
     col = renderSky(ro, rd);
   }
@@ -103,7 +117,7 @@ void main() {
   vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy;
   p *= iResolution.xy / iResolution.y;
 
-  vec3 origin = vec3(0.0, 3.0, -17.0);
+  vec3 origin = vec3(0.0, 5.0, -17.0);
   vec3 target = vec3(0.0, 0.0, 0.0);
   mat3 toWorld = setCamera(origin, target, 0.0);
   vec3 rd = toWorld * normalize(vec3(p.xy, 1.25));
