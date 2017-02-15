@@ -1,4 +1,5 @@
 const regl = require('regl')();
+const resl = require('resl');
 const glsl = require('glslify');
 const createFPS = require('fps-indicator');
 
