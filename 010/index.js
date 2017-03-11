@@ -1,10 +1,14 @@
 const regl = require('regl')();
 const glsl = require('glslify');
-const OSC = require('osc-js');
+const touch = require('touches');
 
-const osc = new OSC();
+let posX = posY = 0;
 
-osc.open();
+touch(window)
+  .on('move', (ev, position) => {
+    posX = position[0];
+    posY = position[1];
+  });
 
 const drawScene = regl({
   vert: glsl.file('./vert.glsl'),
@@ -26,7 +30,10 @@ const drawScene = regl({
       return [viewportWidth, viewportHeight];
     },
     time: regl.context('time'),
-    lightDir: [0.25, 0.5, 0.1],
+    lightDir: [0.5, 0.5, 0.7],
+    mousePos: (context, props) => {
+      return [props.posX, props.posY];
+    },
   },
   count: 6,
 });
@@ -36,6 +43,5 @@ regl.frame(({tick}) => {
     color: [0, 0, 0, 1],
     depth: 1,
   });
-
-  drawScene();
+  drawScene({ posX, posY });
 });
