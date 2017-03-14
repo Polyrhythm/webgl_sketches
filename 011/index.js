@@ -29,6 +29,10 @@ const floorUV = [
 ];
 
 const drawDragon = regl({
+  cull: {
+    enable: true,
+    face: 'back',
+  },
   frag: glsl.file('./frag.glsl'),
   vert: glsl.file('./vert.glsl'),
   attributes: {
