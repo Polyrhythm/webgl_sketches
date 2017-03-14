@@ -128,10 +128,11 @@ void main()
   m.y = -m.y;
 
   vec3 n;
-  float noise = snoise(vec3(uv * 5.0, time * 0.25), n);
+  float noise = snoise(vec3(uv * 10.0, time * 0.25), n);
   n = normalize(n);
-  float incidence = saturate(dot(n, normalize(lightDir)));
-  vec3 Fd = vec3(0.1, 0.2, 0.3) * incidence;
+  vec3 lightDirection = vec3(uv.x, 1.0, uv.y) - vec3(m.x, 1.0, m.y);
+  float incidence = saturate(dot(n, normalize(lightDirection)));
+  vec3 Fd = vec3(1.0 - n * 2.0) * incidence;
 
-  gl_FragColor = vec4(Fd * 0.8 + 0.5 * (1.0 - length(uv - m)), 1.0);
+  gl_FragColor = vec4(Fd * 1.0 - 0.5 * 0.25 * length(uv - m), 1.0);
 }
