@@ -1,7 +1,11 @@
 precision highp float;
 
+uniform vec2 resolution;
+uniform sampler2D tex;
+varying vec2 vUV;
+
 // Simulation type
-#define TEST
+#define ASYMMETRIC
 
 #define TIMESTEP 1.0
 
@@ -26,16 +30,19 @@ precision highp float;
 #define Db 0.1
 #endif
 
-#ifdef TEST
+#ifdef JITTER
 #define F 0.04
 #define K 0.059
 #define Da 0.2
 #define Db 0.1
 #endif
 
-uniform vec2 resolution;
-uniform sampler2D tex;
-varying vec2 vUV;
+#ifdef ASYMMETRIC
+#define F mix(0.04, 0.05, vUV.x)
+#define K 0.0649
+#define Da 0.2
+#define Db 0.1
+#endif
 
 void main()
 {

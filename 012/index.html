@@ -56,21 +56,21 @@ var framebuffers = Array(2).fill().map(function () {
 
 var drawQuad = regl({
   vert: glsl(["#define GLSLIFY 1\nattribute vec2 position, uv;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n  vUV = uv;\n  gl_Position = vec4(position, 0.0, 1.0);\n}\n"]),
-  frag: glsl(["precision highp float;\n#define GLSLIFY 1\n\n// Simulation type\n#define DEFAULT\n\n#define TIMESTEP 1.0\n#define Da 0.2\n#define Db 0.1\n\n#ifdef DEFAULT\n#define F 0.0545\n#define K 0.062\n#endif\n\n#ifdef MITOSIS\n#define F 0.0367\n#define K 0.0649\n#endif\n\n#ifdef TEST\n#define F 0.0321\n#define K 0.0559\n#endif\n\nuniform vec2 resolution;\nuniform sampler2D tex;\nvarying vec2 vUV;\n\nvoid main()\n{\n  vec2 r = resolution;\n  vec2 p = gl_FragCoord.xy;\n  vec2 n = p + vec2(0.0, 1.0);\n  vec2 e = p + vec2(1.0, 0.0);\n  vec2 s = p + vec2(0.0, -1.0);\n  vec2 w = p + vec2(-1.0, 0.0);\n\n  vec2 val = texture2D(tex, vUV).xy;\n  vec2 laplacian = texture2D(tex, n / r).xy;\n  laplacian += texture2D(tex, e / r).xy;\n  laplacian += texture2D(tex, s / r).xy;\n  laplacian += texture2D(tex, w / r).xy;\n  laplacian -= 4.0 * val;\n\n  vec2 delta;\n  delta.x = Da * laplacian.x - val.x * val.y * val.y + F * (1.0 - val.x);\n  delta.y = Db * laplacian.y + val.x * val.y * val.y - (K + F) * val.y;\n\n  gl_FragColor = vec4(val + delta * TIMESTEP, 0.0, 0.0);\n}\n"]),
+  frag: glsl(["precision highp float;\n#define GLSLIFY 1\n\nuniform vec2 resolution;\nuniform sampler2D tex;\nvarying vec2 vUV;\n\n// Simulation type\n#define ASYMMETRIC\n\n#define TIMESTEP 1.0\n\n#ifdef DEFAULT\n#define F 0.0545\n#define K 0.062\n#define Da 0.2\n#define Db 0.1\n#endif\n\n#ifdef MITOSIS\n#define F 0.0367\n#define K 0.0649\n#define Da 0.2\n#define Db 0.1\n#endif\n\n#ifdef DOTS\n#define F 0.0321\n#define K 0.0559\n#define Da 0.2\n#define Db 0.1\n#endif\n\n#ifdef JITTER\n#define F 0.04\n#define K 0.059\n#define Da 0.2\n#define Db 0.1\n#endif\n\n#ifdef ASYMMETRIC\n#define F mix(0.04, 0.05, vUV.x)\n#define K 0.0649\n#define Da 0.2\n#define Db 0.1\n#endif\n\nvoid main()\n{\n  vec2 r = resolution;\n  vec2 p = gl_FragCoord.xy;\n  vec2 n = p + vec2(0.0, 1.0);\n  vec2 e = p + vec2(1.0, 0.0);\n  vec2 s = p + vec2(0.0, -1.0);\n  vec2 w = p + vec2(-1.0, 0.0);\n\n  vec2 val = texture2D(tex, vUV).xy;\n  vec2 laplacian = texture2D(tex, n / r).xy;\n  laplacian += texture2D(tex, e / r).xy;\n  laplacian += texture2D(tex, s / r).xy;\n  laplacian += texture2D(tex, w / r).xy;\n  laplacian -= 4.0 * val;\n\n  vec2 delta;\n  delta.x = Da * laplacian.x - val.x * val.y * val.y + F * (1.0 - val.x);\n  delta.y = Db * laplacian.y + val.x * val.y * val.y - (K + F) * val.y;\n\n  gl_FragColor = vec4(val + delta * TIMESTEP, 0.0, 0.0);\n}\n"]),
   uniforms: {
     tex: function (_, props) {
       return framebuffers[props.iter % 2];
     }
   },
 
-  framebuffer: function (context, props) {
+  framebuffer: function (_, props) {
     return framebuffers[(props.iter + 1) % 2];
   }
 });
 
 var seeQuad = regl({
   vert: glsl(["#define GLSLIFY 1\nattribute vec2 position, uv;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n  vUV = uv;\n  gl_Position = vec4(position, 0.0, 1.0);\n}\n"]),
-  frag: glsl(["precision highp float;\n#define GLSLIFY 1\n\n#define COLOR_MIN 0.2\n#define COLOR_MAX 0.35\n\n#define saturate(x) clamp(x, 0.0, 1.0)\n\nuniform vec2 resolution;\nuniform sampler2D tex;\nvarying vec2 vUV;\n\nfloat getGradient(vec2 uv)\n{\n  return (COLOR_MAX - texture2D(tex, uv).y) /\n         (COLOR_MAX - COLOR_MIN);\n}\n\nvoid main()\n{\n  vec2 eps = vec2(0, 0.002);\n  vec2 n = vUV + eps.xy;\n  vec2 s = vUV - eps.xy;\n  vec2 e = vUV + eps.yx;\n  vec2 w = vUV - eps.yx;\n\n  vec3 normal;\n  normal.x = getGradient(e) - getGradient(w);\n  normal.y = 1.0;\n  normal.z = getGradient(n) - getGradient(s);\n  normal = normalize(normal);\n\n  vec3 lightDir = normalize(vec3(0.5, 1.0, 0.25));\n  float incidence = saturate(dot(normal, lightDir));\n  vec3 Fd = vec3(0.3, 0.2, 0.3) * incidence;\n\n  gl_FragColor = vec4(Fd, 1.0);\n}\n"]),
+  frag: glsl(["precision highp float;\n#define GLSLIFY 1\n\n#define COLOR_MIN 0.2\n#define COLOR_MAX 0.35\n\n#define saturate(x) clamp(x, 0.0, 1.0)\n\nuniform vec2 resolution;\nuniform sampler2D tex;\nvarying vec2 vUV;\n\nfloat getGradient(vec2 uv)\n{\n  return (COLOR_MAX - texture2D(tex, uv).y) /\n         (COLOR_MAX - COLOR_MIN);\n}\n\nvoid main()\n{\n  vec2 eps = vec2(0, 0.002);\n  vec2 n = vUV + eps.xy;\n  vec2 s = vUV - eps.xy;\n  vec2 e = vUV + eps.yx;\n  vec2 w = vUV - eps.yx;\n\n  vec3 normal;\n  normal.x = getGradient(e) - getGradient(w);\n  normal.y = 1.0;\n  normal.z = getGradient(n) - getGradient(s);\n  normal = normalize(normal);\n\n  float v = getGradient(vUV);\n\n  vec3 lightDir = normalize(vec3(0.5, 1.0, 0.25));\n  float incidence = saturate(dot(normal, lightDir));\n  vec3 Fd = vec3(0.3, 0.2, 0.7) * incidence;\n\n  gl_FragColor = vec4(Fd, 1.0);\n}\n"]),
   attributes: {
     position: verts,
     uv: uv
