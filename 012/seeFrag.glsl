@@ -33,7 +33,7 @@ void main()
 
   vec3 lightDir = normalize(vec3(0.5, 1.0, 0.25));
   float incidence = saturate(dot(normal, lightDir));
-  vec3 Fd = vec3(0.3, 0.2, 0.7) * incidence;
+  vec3 Fd = vec3(vUV, 1.0) * incidence;
 
   gl_FragColor = vec4(Fd, 1.0);
 }
