@@ -1,7 +1,7 @@
 precision highp float;
 
 // Simulation type
-#define TEST
+#define DEFAULT
 
 #define TIMESTEP 1.0
 #define Da 0.2
