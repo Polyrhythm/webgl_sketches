@@ -21,8 +21,8 @@ const indices = [
   0, 1, 2, 2, 3, 0
 ];
 
-const width = 512;
-const height = 512;
+const width = regl._gl.canvas.width;
+const height = regl._gl.canvas.height;
 
 function getInitCond() {
   let a = new Array(4 * width * height);
@@ -57,7 +57,7 @@ const framebuffers = (Array(2)).fill().map(() =>
       data: getInitCond(),
       format: 'rgba',
       type: 'float',
-      wrap: 'repeat'
+      wrap: 'clamp'
     }),
   })
 );
@@ -65,8 +65,13 @@ const framebuffers = (Array(2)).fill().map(() =>
 const drawQuad = regl({
   vert: glsl.file('./vert.glsl'),
   frag: glsl.file('./frag.glsl'),
+  uniforms: {
+    tex: (_, props) => framebuffers[props.iter % 2],
+  },
 
-  framebuffer: ({tick}) => framebuffers[(tick + 1) % 2],
+  framebuffer: (context, props) => {
+    return framebuffers[(props.iter + 1) % 2];
+  }
 });
 
 const seeQuad = regl({
@@ -79,15 +84,18 @@ const seeQuad = regl({
   uniforms: {
     resolution: ({viewportWidth, viewportHeight}) =>
       [viewportWidth, viewportHeight],
-    tex: ({tick}) => framebuffers[tick % 2],
+    tex: framebuffers[0],
   },
   elements: indices,
   depth: { enable: false },
 });
 
-regl.frame(({tick}) => {
+const ITERATION_SPEED = 40;
+regl.frame(({tick, viewportWidth, viewportHeight}) => {
   seeQuad(() => {
-    drawQuad();
+    for (let i = 0; i < ITERATION_SPEED; i++) {
+      drawQuad({iter: i});
+    }
     regl.draw();
   });
 });

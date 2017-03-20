@@ -1,10 +1,26 @@
 precision highp float;
 
+// Simulation type
+#define TEST
+
 #define TIMESTEP 1.0
-#define F 0.0545
-#define K 0.062
 #define Da 0.2
 #define Db 0.1
+
+#ifdef DEFAULT
+#define F 0.0545
+#define K 0.062
+#endif
+
+#ifdef MITOSIS
+#define F 0.0367
+#define K 0.0649
+#endif
+
+#ifdef TEST
+#define F 0.0321
+#define K 0.0559
+#endif
 
 uniform vec2 resolution;
 uniform sampler2D tex;
@@ -12,7 +28,7 @@ varying vec2 vUV;
 
 void main()
 {
-  vec2 r = vec2(512.0);
+  vec2 r = resolution;
   vec2 p = gl_FragCoord.xy;
   vec2 n = p + vec2(0.0, 1.0);
   vec2 e = p + vec2(1.0, 0.0);
