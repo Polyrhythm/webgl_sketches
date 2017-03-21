@@ -69,7 +69,7 @@ const drawQuad = regl({
     tex: (_, props) => framebuffers[props.iter % 2],
   },
 
-  framebuffer: (context, props) => {
+  framebuffer: (_, props) => {
     return framebuffers[(props.iter + 1) % 2];
   }
 });

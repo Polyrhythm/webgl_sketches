@@ -1,25 +1,36 @@
 precision highp float;
 
 // Simulation type
-#define DEFAULT
+#define TEST
 
 #define TIMESTEP 1.0
-#define Da 0.2
-#define Db 0.1
 
 #ifdef DEFAULT
 #define F 0.0545
 #define K 0.062
+#define Da 0.2
+#define Db 0.1
 #endif
 
 #ifdef MITOSIS
 #define F 0.0367
 #define K 0.0649
+#define Da 0.2
+#define Db 0.1
+#endif
+
+#ifdef DOTS
+#define F 0.0321
+#define K 0.0559
+#define Da 0.2
+#define Db 0.1
 #endif
 
 #ifdef TEST
-#define F 0.0321
-#define K 0.0559
+#define F 0.04
+#define K 0.059
+#define Da 0.2
+#define Db 0.1
 #endif
 
 uniform vec2 resolution;
