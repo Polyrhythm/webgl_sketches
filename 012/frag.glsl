@@ -5,7 +5,7 @@ uniform sampler2D tex;
 varying vec2 vUV;
 
 // Simulation type
-#define WAVES
+#define ASYMMETRIC_MITOSIS
 
 #define TIMESTEP 1.0
 

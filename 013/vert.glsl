@@ -1,4 +1,4 @@
-attribute vec4 position;
+attribute vec3 position;
 attribute vec3 normal;
 
 uniform mat4 projection, view;
@@ -10,7 +10,7 @@ varying vec3 vLightPos;
 
 void main()
 {
-  vec4 pos = projection * view * position;
+  vec4 pos = projection * view * vec4(position, 1.0);
   vPosition = pos.xyz;
   vNormal = normal;
   vLightPos = vec3(view * vec4(lightPos, 1.0));
