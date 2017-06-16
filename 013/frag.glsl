@@ -7,6 +7,12 @@ precision highp float;
 varying vec3 vPosition;
 varying vec3 vNormal;
 varying vec3 vLightPos;
+varying vec2 vUV;
+
+uniform sampler2D tex;
+uniform bool linearColours;
+uniform bool gammaCorrection;
+uniform vec3 lightColourUnf;
 
 void main()
 {
@@ -14,9 +20,21 @@ void main()
   vec3 lightDir = normalize(vLightPos - vPosition);
   float diffuse = lambert(lightDir, n);
 
-  vec3 baseColour = toLinear(vec3(1.0));
-  vec3 lightColour = toLinear(vec3(1.0));
+  vec3 baseColour = texture2D(tex, vUV).rgb;
+  vec3 lightColour = lightColourUnf;
+
+  if (linearColours)
+  {
+    baseColour = toLinear(baseColour);
+    lightColour = toLinear(lightColour);
+  }
 
   vec3 colour = baseColour * lightColour * diffuse;
-  gl_FragColor = toGamma(vec4(colour, 1.0));
+
+  if (gammaCorrection)
+  {
+    colour = toGamma(colour);
+  }
+
+  gl_FragColor = vec4(colour, 1.0);
 }
