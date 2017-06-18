@@ -16,7 +16,7 @@ void main()
 {
   vec3 ecEyeDir = normalize(-ecPosition);
   vec3 wcEyeDir = vec3(inverseView * vec4(ecEyeDir, 0.0));
-  vec3 wcNormal = vec3(inverseView * vec4(ecNormal, 0.0));
+  vec3 wcNormal = normalize(ecNormal);
   vec3 reflectionWorld = reflect(-wcEyeDir, normalize(wcNormal));
 
   vec4 colour = texture2D(envMap, envMapEquirect(reflectionWorld));
