@@ -123,6 +123,11 @@ require('resl')({
     },
   },
 
+  onProgress: (progress) => {
+    const intensity = 1.0 - progress;
+    regl.clear({ color: [intensity, intensity, intensity, 1]});
+  },
+
   onDone: ({env}) => {
     regl.frame(() => {
       regl.clear({
