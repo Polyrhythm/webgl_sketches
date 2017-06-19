@@ -1,0 +1,32 @@
+{
+  "name": "014",
+  "version": "1.0.0",
+  "description": "lul",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "scripts": {
+    "start": "budo index.js --open --live --host localhost --force-default-index true -- -t es2040 -t glslify",
+    "build": "browserify index.js -t es2040 -t glslify | indexhtmlify > index.html"
+  },
+  "devDependencies": {
+    "browserify": "^13.1.1",
+    "budo": "^9.3.0",
+    "es2040": "^1.2.4",
+    "indexhtmlify": "^1.3.1"
+  },
+  "dependencies": {
+    "control-panel": "^1.2.0",
+    "gl-mat4": "^1.1.4",
+    "glsl-gamma": "^2.0.0",
+    "glsl-inverse": "^1.0.0",
+    "glsl-transpose": "^1.0.0",
+    "glslify": "^6.1.0",
+    "parse-hdr": "^1.0.0",
+    "primitive-sphere": "^3.0.0",
+    "regl": "^1.3.0",
+    "regl-camera": "^1.1.0",
+    "resl": "^1.0.3"
+  }
+}
