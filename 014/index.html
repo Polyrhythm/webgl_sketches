@@ -1,10 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.0/gh-fork-ribbon.min.css" />
+<!--[if lt IE 9]>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.0/gh-fork-ribbon.ie.min.css" />
+<![endif]-->
 <title>---</title>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
 <meta charset=utf-8></head>
-<body></body>
+<body>
+  <a class="github-fork-ribbon" href="https://github.com/Polyrhythm/webgl_sketches/tree/master/014" title="Fork me on GitHub">Fork me on GitHub</a>
+</body>
 <script>
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var regl = require('regl')({
@@ -17029,7 +17035,7 @@ function fromRotationTranslation(out, q, v) {
     out[13] = v[1];
     out[14] = v[2];
     out[15] = 1;
-    
+
     return out;
 };
 },{}],111:[function(require,module,exports){
@@ -17155,8 +17161,8 @@ function invert(out, a) {
         // Calculate the determinant
         det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
-    if (!det) { 
-        return null; 
+    if (!det) {
+        return null;
     }
     det = 1.0 / det;
 
@@ -17288,7 +17294,7 @@ function multiply(out, a, b) {
         a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
 
     // Cache only the current line of the second matrix
-    var b0  = b[0], b1 = b[1], b2 = b[2], b3 = b[3];  
+    var b0  = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
     out[0] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
     out[1] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
     out[2] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
@@ -17450,7 +17456,7 @@ function rotate(out, a, rad, axis) {
         b20, b21, b22;
 
     if (Math.abs(len) < 0.000001) { return null; }
-    
+
     len = 1 / len;
     x *= len;
     y *= len;
@@ -17670,7 +17676,7 @@ module.exports = str;
 function str(a) {
     return 'mat4(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + a[3] + ', ' +
                     a[4] + ', ' + a[5] + ', ' + a[6] + ', ' + a[7] + ', ' +
-                    a[8] + ', ' + a[9] + ', ' + a[10] + ', ' + a[11] + ', ' + 
+                    a[8] + ', ' + a[9] + ', ' + a[10] + ', ' + a[11] + ', ' +
                     a[12] + ', ' + a[13] + ', ' + a[14] + ', ' + a[15] + ')';
 };
 },{}],126:[function(require,module,exports){
@@ -17759,7 +17765,7 @@ function transpose(out, a) {
         out[14] = a[11];
         out[15] = a[15];
     }
-    
+
     return out;
 };
 },{}],128:[function(require,module,exports){
@@ -19297,7 +19303,7 @@ var inserted = {};
 module.exports = function (css, options) {
     if (inserted[css]) return;
     inserted[css] = true;
-    
+
     var elem = document.createElement('style');
     elem.setAttribute('type', 'text/css');
 
@@ -19306,7 +19312,7 @@ module.exports = function (css, options) {
     } else {
       elem.styleSheet.cssText = css;
     }
-    
+
     var head = document.getElementsByTagName('head')[0];
     if (options && options.prepend) {
         head.insertBefore(elem, head.childNodes[0]);
@@ -23422,7 +23428,7 @@ module.exports = function privateDecrypt(private_key, enc, reverse) {
   } else {
     padding = 4;
   }
-  
+
   var key = parseKeys(private_key);
   var k = key.modulus.byteLength();
   if (enc.length > k || new bn(enc).cmp(key.modulus) >= 0) {
@@ -38926,7 +38932,7 @@ function toPX(str, element) {
   element = element || document.body
   str = (str || 'px').trim().toLowerCase()
   if(element === window || element === document) {
-    element = document.body 
+    element = document.body
   }
   switch(str) {
     case '%':  //Ambiguous, not sure if we should use width or height
@@ -39124,13 +39130,13 @@ Script.prototype.runInContext = function (context) {
     if (!(context instanceof Context)) {
         throw new TypeError("needs a 'context' argument.");
     }
-    
+
     var iframe = document.createElement('iframe');
     if (!iframe.style) iframe.style = {};
     iframe.style.display = 'none';
-    
+
     document.body.appendChild(iframe);
-    
+
     var win = iframe.contentWindow;
     var wEval = win.eval, wExecScript = win.execScript;
 
@@ -39139,7 +39145,7 @@ Script.prototype.runInContext = function (context) {
         wExecScript.call(win, 'null');
         wEval = win.eval;
     }
-    
+
     forEach(Object_keys(context), function (key) {
         win[key] = context[key];
     });
@@ -39148,11 +39154,11 @@ Script.prototype.runInContext = function (context) {
             win[key] = context[key];
         }
     });
-    
+
     var winKeys = Object_keys(win);
 
     var res = wEval.call(win, this.code);
-    
+
     forEach(Object_keys(win), function (key) {
         // Avoid copying circular objects like `top` and `window` by only
         // updating existing context properties or new properties in the `win`
@@ -39167,9 +39173,9 @@ Script.prototype.runInContext = function (context) {
             defineProp(context, key, win[key]);
         }
     });
-    
+
     document.body.removeChild(iframe);
-    
+
     return res;
 };
 
