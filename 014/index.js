@@ -38,7 +38,7 @@ const panel = control([
     type: 'range',
     label: EXPOSURE,
     min: 0,
-    max: 16,
+    max: 4,
     initial: 1,
   },
   {
